@@ -1,0 +1,18 @@
+// app global css in SCSS form
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@200;400;700;900&display=swap');
+
+::selection {
+  color: #e8eaf6;
+  background-color: $primary;
+}
+body {
+  background: $dark;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.btn-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 2;
+}
