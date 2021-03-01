@@ -1,9 +1,11 @@
 import { app, BrowserWindow, nativeTheme, ipcMain } from 'electron'
-import { SportsLib } from '@sports-alliance/sports-lib';
+import { SportsLib } from '@sports-alliance/sports-lib'
 import { EventExporterGPX } from '@sports-alliance/sports-lib/lib/events/adapters/exporters/exporter.gpx.js'
+import { DOMParser } from 'xmldom'
 
 const path = require('path')
 const fs = require('fs')
+const domParser = new DOMParser();
 
 try {
   if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors === true) {
@@ -26,7 +28,7 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
-    width: 1300,
+    width: 1800,
     height: 700,
     useContentSize: true,
     frame: false,
@@ -98,20 +100,35 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
 ipcMain.on('convert-all-workouts', async (event, args) => {
   try {
     const { dir, workoutList } = args
-    console.log('workoutList: ', workoutList);
     let response = await fs.readdirSync(`${dir}\\Workouts`)
-    console.log('response: ', response);
     response = response.filter(f => f.indexOf('tcx') > -1)
+    response = response.filter(f => workoutList.map(w => w.file).includes(f.replace('.tcx', '.json')))
+    event.reply('asynchronous-reply', { update: 'Workouts loaded', action: 'convert-all-workouts', payload: response.length })
     let contents = []
-    for await (const file of response) {
-      const f = await fs.readFileSync(`${dir}\\Workouts\\${file}`, 'utf8')
-      SportsLib.importFromTCX(f.buffer).then(() => {
+    if (!fs.existsSync(`${dir}\\GPX`)){
+      fs.mkdirSync(`${dir}\\GPX`);
+    } else {
 
+    }
+    for await (const file of response) {
+      const f = await fs.readFileSync(`${dir}\\Workouts\\${file}`, null)
+      SportsLib.importFromTCX(domParser.parseFromString(f.toString(), 'application/xml')).then((evt) => {
+        const gpxPromise = new EventExporterGPX().getAsString(evt);
+        gpxPromise.then((gpxString) => {
+          fs.writeFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, gpxString, (wError) => {
+            if (wError) { console.error(JSON.stringify(wError)); }
+          });
+          event.reply('asynchronous-reply', { update: 'Workout converted .tcx > .gpx', action: 'convert-all-workouts', payload: `${file.replace('.tcx', '.gpx')}` })
+        }).catch((cError) => {
+            console.error(JSON.stringify(cError));
+        });
       })
     }
+    event.reply('asynchronous-reply', { update: 'Process finished', action: 'convert-all-workouts', payload: 'success' })
     event.reply('asynchronous-reply', { success: true, action: 'convert-all-workouts' })
+
   } catch (error) {
-    event.reply('asynchronous-reply', { error: true, errorMessage: 'error while ', action: 'convert-all-workouts' })
+    event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'convert-all-workouts' })
     console.error(error)
   }
 })
