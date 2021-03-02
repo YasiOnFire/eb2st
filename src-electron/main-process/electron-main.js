@@ -3,9 +3,10 @@ import { SportsLib } from '@sports-alliance/sports-lib'
 import { EventExporterGPX } from '@sports-alliance/sports-lib/lib/events/adapters/exporters/exporter.gpx.js'
 import { DOMParser } from 'xmldom'
 
+// const puppeteer = require('puppeteer')
 const path = require('path')
 const fs = require('fs')
-const domParser = new DOMParser();
+const domParser = new DOMParser()
 
 try {
   if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors === true) {
@@ -99,16 +100,16 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
 
 ipcMain.on('convert-all-workouts', async (event, args) => {
   try {
-    const { dir, workoutList } = args
+    const { dir, workoutList, login, passwd } = args
+    console.log('login, passwd: ', login, passwd);
     let response = await fs.readdirSync(`${dir}\\Workouts`)
     response = response.filter(f => f.indexOf('tcx') > -1)
     response = response.filter(f => workoutList.map(w => w.file).includes(f.replace('.tcx', '.json')))
+    const responseGPX = []
     event.reply('asynchronous-reply', { update: 'Workouts loaded', action: 'convert-all-workouts', payload: response.length })
     let contents = []
     if (!fs.existsSync(`${dir}\\GPX`)){
       fs.mkdirSync(`${dir}\\GPX`);
-    } else {
-
     }
     for await (const file of response) {
       const f = await fs.readFileSync(`${dir}\\Workouts\\${file}`, null)
@@ -118,6 +119,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           fs.writeFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, gpxString, (wError) => {
             if (wError) { console.error(JSON.stringify(wError)); }
           });
+          responseGPX.push(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`)
           event.reply('asynchronous-reply', { update: 'Workout converted .tcx > .gpx', action: 'convert-all-workouts', payload: `${file.replace('.tcx', '.gpx')}` })
         }).catch((cError) => {
             console.error(JSON.stringify(cError));
@@ -126,7 +128,86 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
     }
     event.reply('asynchronous-reply', { update: 'Process finished', action: 'convert-all-workouts', payload: 'success' })
     event.reply('asynchronous-reply', { success: true, action: 'convert-all-workouts' })
+    const firstFileBuffer = await fs.readFileSync(responseGPX[0], null)
 
+    const win = new BrowserWindow({
+      show: true,
+      // modal: true,
+      // skipTaskbar: true,
+      // frame: false,
+      webPreferences: {
+        nodeIntegration: false,
+        devTools: true
+        // preload: true
+        // webSecurity: false
+      }
+    })
+    win.loadURL('https://www.sports-tracker.com/login')
+    await win.webContents.on('did-finish-load', async (event, result) => {
+      
+      await win.webContents.executeJavaScript(`
+        const init = async () => {
+          // helper wait for selector function
+          const wait = async (selector) => {
+            while(!document.querySelector(selector)) {
+              await new Promise(r => setTimeout(r, 700));
+            }
+          }
+
+          document.querySelector('.username').value = '${login}'
+          document.querySelector('.password').value = '${passwd}'
+          document.querySelector('.submit').dispatchEvent(new Event('click'))
+
+          await wait('.add-workout')
+          document.querySelector('.add-workout').dispatchEvent(new Event('click'))
+
+          await wait('.import-button')
+          document.querySelector('.import-button').dispatchEvent(new Event('click'))
+
+          await wait('[type="file"]')
+          const dt = new DataTransfer()
+          // for (const item of files) {
+            const response = await fetch('data:application/gpx+xml;base64,${firstFileBuffer.toString('base64')}');
+            const file = new File([await response.blob()], 'yasio.gpx', {type: 'application/gpx+xml'});
+            dt.items.add(file);
+          // }
+          document.querySelector('[type="file"]').files = dt.files;
+
+          setTimeout(async () => {
+            document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
+
+            await wait('.select-sharing');
+            [...document.querySelectorAll('.select-sharing')].forEach(s => s.value = "string:Friends")
+
+            // await wait('.save-button');
+            // document.querySelector('.save-button').dispatchEvent(new Event('click'))
+          }, 2000)
+        }
+        init()
+      `)
+      // console.log('zalogowano');
+      // win.webContents.once('did-navigate', () => {
+      //   console.log("1Main view logs this no problem....", win.webContents.getURL());
+      //   win.webContents.once('dom-ready', () => {
+      //         console.log("Main view logs this no problem....", win.webContents.getURL());
+      //         // document.querySelector('.add-workout').dispatchEvent(new Event('click'))
+      //         //     win.webContents.executeJavaScript(`
+      //         //     `)
+      //   })
+      // })
+    })
+
+    // const browser = await puppeteer.launch({
+    //   headless: false,
+    //   args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox']
+    // });
+    // const page = await browser.newPage();
+    // await page.goto('https://www.sports-tracker.com/login', {
+    //   waitUntil: 'networkidle2',
+    // })
+    // await page.type('.username', login)
+    // await page.type('.password', passwd)
+    // await page.click('.submit')
   } catch (error) {
     event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'convert-all-workouts' })
     console.error(error)
