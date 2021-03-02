@@ -111,25 +111,29 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
     if (!fs.existsSync(`${dir}\\GPX`)){
       fs.mkdirSync(`${dir}\\GPX`);
     }
+    const fileBuffers = []
     for await (const file of response) {
       const f = await fs.readFileSync(`${dir}\\Workouts\\${file}`, null)
       SportsLib.importFromTCX(domParser.parseFromString(f.toString(), 'application/xml')).then((evt) => {
         const gpxPromise = new EventExporterGPX().getAsString(evt);
-        gpxPromise.then((gpxString) => {
+        gpxPromise.then(async (gpxString) => {
           fs.writeFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, gpxString, (wError) => {
             if (wError) { console.error(JSON.stringify(wError)); }
           });
-          responseGPX.push(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`)
+          // responseGPX.push(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`)
+          const gpx = await fs.readFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, null)
+          fileBuffers.push(gpx.toString('base64'))
           event.reply('asynchronous-reply', { update: 'Workout converted .tcx > .gpx', action: 'convert-all-workouts', payload: `${file.replace('.tcx', '.gpx')}` })
         }).catch((cError) => {
-            console.error(JSON.stringify(cError));
+          console.error(JSON.stringify(cError));
         });
       })
     }
     event.reply('asynchronous-reply', { update: 'Process finished', action: 'convert-all-workouts', payload: 'success' })
     event.reply('asynchronous-reply', { success: true, action: 'convert-all-workouts' })
-    const firstFileBuffer = await fs.readFileSync(responseGPX[0], null)
+    // const firstFileBuffer = await fs.readFileSync(responseGPX[0], null)
 
+    console.log('fileBuffers: ', fileBuffers.length);
     const win = new BrowserWindow({
       show: true,
       // modal: true,
@@ -166,22 +170,23 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
 
           await wait('[type="file"]')
           const dt = new DataTransfer()
-          // for (const item of files) {
-            const response = await fetch('data:application/gpx+xml;base64,${firstFileBuffer.toString('base64')}');
-            const file = new File([await response.blob()], 'yasio.gpx', {type: 'application/gpx+xml'});
-            dt.items.add(file);
+          console.log('${fileBuffers}')
+          // for (const item of ${fileBuffers}) {
+          //   const response = await fetch('data:application/gpx+xml;base64,' + item.toString('base64') + ');
+          //   // const file = new File([await response.blob()], 'yasio.gpx', {type: 'application/gpx+xml'});
+          //   // dt.items.add(file);
           // }
-          document.querySelector('[type="file"]').files = dt.files;
+          // document.querySelector('[type="file"]').files = dt.files;
 
-          setTimeout(async () => {
-            document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
+          // setTimeout(async () => {
+          //   document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
 
-            await wait('.select-sharing');
-            [...document.querySelectorAll('.select-sharing')].forEach(s => s.value = "string:Friends")
+          //   await wait('.select-sharing');
+          //   [...document.querySelectorAll('.select-sharing')].forEach(s => s.value = "string:Friends")
 
-            // await wait('.save-button');
-            // document.querySelector('.save-button').dispatchEvent(new Event('click'))
-          }, 2000)
+          //   // await wait('.save-button');
+          //   // document.querySelector('.save-button').dispatchEvent(new Event('click'))
+          // }, 2000)
         }
         init()
       `)
