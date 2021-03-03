@@ -101,7 +101,6 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
 ipcMain.on('convert-all-workouts', async (event, args) => {
   try {
     const { dir, workoutList, login, passwd } = args
-    console.log('login, passwd: ', login, passwd);
     let response = await fs.readdirSync(`${dir}\\Workouts`)
     response = response.filter(f => f.indexOf('tcx') > -1)
     response = response.filter(f => workoutList.map(w => w.file).includes(f.replace('.tcx', '.json')))
@@ -116,12 +115,12 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
       const f = await fs.readFileSync(`${dir}\\Workouts\\${file}`, null)
       SportsLib.importFromTCX(domParser.parseFromString(f.toString(), 'application/xml')).then((evt) => {
         const gpxPromise = new EventExporterGPX().getAsString(evt);
-        gpxPromise.then(async (gpxString) => {
+        gpxPromise.then((gpxString) => {
           fs.writeFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, gpxString, (wError) => {
             if (wError) { console.error(JSON.stringify(wError)); }
           });
           // responseGPX.push(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`)
-          const gpx = await fs.readFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, null)
+          const gpx = fs.readFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, null)
           fileBuffers.push(gpx.toString('base64'))
           event.reply('asynchronous-reply', { update: 'Workout converted .tcx > .gpx', action: 'convert-all-workouts', payload: `${file.replace('.tcx', '.gpx')}` })
         }).catch((cError) => {
@@ -154,8 +153,11 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           // helper wait for selector function
           const wait = async (selector) => {
             while(!document.querySelector(selector)) {
-              await new Promise(r => setTimeout(r, 700));
+              await new Promise(r => setTimeout(r, 1500));
             }
+          }
+          const waitFor = async (seconds) => {
+            await new Promise(r => setTimeout(r, seconds * 1000));
           }
 
           document.querySelector('.username').value = '${login}'
@@ -170,23 +172,35 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
 
           await wait('[type="file"]')
           const dt = new DataTransfer()
-          console.log('${fileBuffers}')
-          // for (const item of ${fileBuffers}) {
-          //   const response = await fetch('data:application/gpx+xml;base64,' + item.toString('base64') + ');
-          //   // const file = new File([await response.blob()], 'yasio.gpx', {type: 'application/gpx+xml'});
-          //   // dt.items.add(file);
-          // }
-          // document.querySelector('[type="file"]').files = dt.files;
+          const x = [${fileBuffers.map(d => `'${d}'`)}];
+          for (const item of x) {
+            const response = await fetch('data:application/gpx+xml;base64,' + item);
+            const file = new File([await response.blob()], 'yasio.gpx', {type: 'application/gpx+xml'});
+            dt.items.add(file);
+          }
+          document.querySelector('[type="file"]').files = dt.files;
 
-          // setTimeout(async () => {
-          //   document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
+          setTimeout(async () => {
+            document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
 
-          //   await wait('.select-sharing');
-          //   [...document.querySelectorAll('.select-sharing')].forEach(s => s.value = "string:Friends")
+            await waitFor(2);
+            await wait('.save-button');
+            
+            await waitFor(2);
+            await wait('.select-sharing');
+            [...document.querySelectorAll('.select-sharing')].forEach(s => { if (s) s.value = "string:Friends"});
+            
+            await waitFor(2);
+            await wait('.select-activity');
+            [...document.querySelectorAll('.select-activity')].forEach(s => { if (s) s.value = "object:309"});
+            [...document.querySelectorAll('[selected-date]')].forEach(el => {
+              console.log(el)
+              console.log(el.closest('ul'))
+              console.log(el.attributes['selected-date'].value)
+              })
 
-          //   // await wait('.save-button');
-          //   // document.querySelector('.save-button').dispatchEvent(new Event('click'))
-          // }, 2000)
+            // document.querySelector('.save-button').dispatchEvent(new Event('click'))
+          }, 2000)
         }
         init()
       `)
