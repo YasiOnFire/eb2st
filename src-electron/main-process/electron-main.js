@@ -154,7 +154,6 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
       
       await win.webContents.executeJavaScript(`
         const init = async () => {
-          // helper wait for selector function
           const wait = async (selector) => {
             while(!document.querySelector(selector)) {
               await new Promise(r => setTimeout(r, 1500));
@@ -165,7 +164,6 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           }
 
           const payload = JSON.parse('${JSON.stringify(workoutList)}')
-          console.log(payload)
 
           document.querySelector('.username').value = '${login}'
           document.querySelector('.password').value = '${passwd}'
@@ -207,9 +205,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
             await wait('.select-activity');
             [...document.querySelectorAll('[selected-date]')].forEach(el => {
               const parent = el.closest('ul')
-              console.log('parent: ', parent)
-              // console.log(el.attributes['selected-date'].value)
-              // console.log(el.attributes['selected-date'].value, payload.find(f => f.timestamp == el.attributes['selected-date'].value))
+
               if (payload.find(f => f.timestamp == el.attributes['selected-date'].value)) {
                 if (parent && parent.querySelector('.select-activity') && parent.querySelector('.select-activity') !== null) {
                   const newVal = payload.find(f => f.timestamp == el.attributes['selected-date'].value).sporttracker;
