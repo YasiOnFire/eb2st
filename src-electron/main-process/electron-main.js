@@ -89,6 +89,9 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
     for (const file of response) {
       const content = Object.assign({}, ...JSON.parse(fs.readFileSync(`${dir}\\Workouts\\${file}`, 'utf8')))
       delete content.points
+      const x = new Date(content.start_time)
+      content.timestamp = +(x.setHours(x.getHours() + 2))
+      content.sporttracker = 'object:300'
       contents.push({ ...content, file })
     }
     event.reply('asynchronous-reply', { success: true, action: 'read-all-workouts', payload: contents })
@@ -134,7 +137,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
 
     console.log('fileBuffers: ', fileBuffers.length);
     const win = new BrowserWindow({
-      show: true,
+      show: false,
       // modal: true,
       // skipTaskbar: true,
       // frame: false,
@@ -146,6 +149,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
       }
     })
     win.loadURL('https://www.sports-tracker.com/login')
+    event.reply('asynchronous-reply', { update: 'Start importing...', action: 'convert-all-workouts', payload: 'success' })
     await win.webContents.on('did-finish-load', async (event, result) => {
       
       await win.webContents.executeJavaScript(`
@@ -159,6 +163,9 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           const waitFor = async (seconds) => {
             await new Promise(r => setTimeout(r, seconds * 1000));
           }
+
+          const payload = JSON.parse('${JSON.stringify(workoutList)}')
+          console.log(payload)
 
           document.querySelector('.username').value = '${login}'
           document.querySelector('.password').value = '${passwd}'
@@ -188,45 +195,44 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
             
             await waitFor(2);
             await wait('.select-sharing');
-            [...document.querySelectorAll('.select-sharing')].forEach(s => { if (s) s.value = "string:Friends"});
+            [...document.querySelectorAll('.select-sharing')].forEach(s => {
+              if (s) { 
+                s.querySelector('option[selected]').remove()
+                s.value = "string:Friends"
+                s.querySelector('option[value="string:Friends"]').setAttribute('selected', 'selected')
+              }
+            });
             
             await waitFor(2);
             await wait('.select-activity');
-            [...document.querySelectorAll('.select-activity')].forEach(s => { if (s) s.value = "object:309"});
             [...document.querySelectorAll('[selected-date]')].forEach(el => {
-              console.log(el)
-              console.log(el.closest('ul'))
-              console.log(el.attributes['selected-date'].value)
-              })
+              const parent = el.closest('ul')
+              console.log('parent: ', parent)
+              // console.log(el.attributes['selected-date'].value)
+              // console.log(el.attributes['selected-date'].value, payload.find(f => f.timestamp == el.attributes['selected-date'].value))
+              if (payload.find(f => f.timestamp == el.attributes['selected-date'].value)) {
+                if (parent && parent.querySelector('.select-activity') && parent.querySelector('.select-activity') !== null) {
+                  const newVal = payload.find(f => f.timestamp == el.attributes['selected-date'].value).sporttracker;
+                  parent.querySelector('.select-activity option[selected]').remove()
+                  parent.querySelector('.select-activity').value = newVal
+                  parent.querySelector('.select-activity option[value="'+newVal+'"]').setAttribute('selected', 'selected')
+                }
+              }
+            })
+            document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
+            document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
+            document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
+            document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
 
-            // document.querySelector('.save-button').dispatchEvent(new Event('click'))
+            await waitFor(1);
+            document.querySelector('.save-button').dispatchEvent(new Event('click'))
           }, 2000)
         }
         init()
       `)
-      // console.log('zalogowano');
-      // win.webContents.once('did-navigate', () => {
-      //   console.log("1Main view logs this no problem....", win.webContents.getURL());
-      //   win.webContents.once('dom-ready', () => {
-      //         console.log("Main view logs this no problem....", win.webContents.getURL());
-      //         // document.querySelector('.add-workout').dispatchEvent(new Event('click'))
-      //         //     win.webContents.executeJavaScript(`
-      //         //     `)
-      //   })
-      // })
     })
+    event.reply('asynchronous-reply', { update: 'Import finished', action: 'convert-all-workouts', payload: 'success' })
 
-    // const browser = await puppeteer.launch({
-    //   headless: false,
-    //   args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox']
-    // });
-    // const page = await browser.newPage();
-    // await page.goto('https://www.sports-tracker.com/login', {
-    //   waitUntil: 'networkidle2',
-    // })
-    // await page.type('.username', login)
-    // await page.type('.password', passwd)
-    // await page.click('.submit')
   } catch (error) {
     event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'convert-all-workouts' })
     console.error(error)
