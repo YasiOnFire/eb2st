@@ -36,6 +36,10 @@ export default {
   padding-top: 32px;
 }
 .q-inner-loading--dark {
+  z-index: 9999;
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, .9) !important;
 }
 .q-page {

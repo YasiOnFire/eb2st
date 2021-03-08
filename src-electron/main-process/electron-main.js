@@ -43,7 +43,8 @@ function createWindow () {
       // preload: path.resolve(__dirname, 'electron-preload.js')
     }
   })
-
+  
+  mainWindow.maximize()
   mainWindow.loadURL(process.env.APP_URL)
 
   mainWindow.on('closed', () => {
@@ -91,9 +92,10 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
       delete content.points
       const x = new Date(content.start_time)
       content.timestamp = +(x.setHours(x.getHours() + 2))
-      content.sporttracker = 'object:300'
+      content.sporttracker = 'Running'
       contents.push({ ...content, file })
     }
+    contents = contents.filter(c => c.distance_km !== 0)
     event.reply('asynchronous-reply', { success: true, action: 'read-all-workouts', payload: contents })
   } catch (error) {
     event.reply('asynchronous-reply', { error: true, errorMessage: 'error while ', action: 'read-all-workouts' })
@@ -103,13 +105,12 @@ ipcMain.on('read-all-workouts', async (event, dir) => {
 
 ipcMain.on('convert-all-workouts', async (event, args) => {
   try {
-    const { dir, workoutList, login, passwd } = args
+    const { dir, workoutList, login, passwd } = JSON.parse(args)
     let response = await fs.readdirSync(`${dir}\\Workouts`)
     response = response.filter(f => f.indexOf('tcx') > -1)
     response = response.filter(f => workoutList.map(w => w.file).includes(f.replace('.tcx', '.json')))
-    const responseGPX = []
     event.reply('asynchronous-reply', { update: 'Workouts loaded', action: 'convert-all-workouts', payload: response.length })
-    let contents = []
+
     if (!fs.existsSync(`${dir}\\GPX`)){
       fs.mkdirSync(`${dir}\\GPX`);
     }
@@ -122,7 +123,6 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           fs.writeFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, gpxString, (wError) => {
             if (wError) { console.error(JSON.stringify(wError)); }
           });
-          // responseGPX.push(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`)
           const gpx = fs.readFileSync(`${dir}\\GPX\\${file.replace('.tcx', '.gpx')}`, null)
           fileBuffers.push(gpx.toString('base64'))
           event.reply('asynchronous-reply', { update: 'Workout converted .tcx > .gpx', action: 'convert-all-workouts', payload: `${file.replace('.tcx', '.gpx')}` })
@@ -131,9 +131,8 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
         });
       })
     }
-    event.reply('asynchronous-reply', { update: 'Process finished', action: 'convert-all-workouts', payload: 'success' })
+    event.reply('asynchronous-reply', { update: 'Converting process finished', action: 'convert-all-workouts', payload: 'success' })
     event.reply('asynchronous-reply', { success: true, action: 'convert-all-workouts' })
-    // const firstFileBuffer = await fs.readFileSync(responseGPX[0], null)
 
     console.log('fileBuffers: ', fileBuffers.length);
     const win = new BrowserWindow({
@@ -149,10 +148,10 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
       }
     })
     win.loadURL('https://www.sports-tracker.com/login')
-    event.reply('asynchronous-reply', { update: 'Start importing...', action: 'convert-all-workouts', payload: 'success' })
-    await win.webContents.on('did-finish-load', async (event, result) => {
-      
-      await win.webContents.executeJavaScript(`
+    event.reply('asynchronous-reply', { update: 'Start batch importing', action: 'convert-all-workouts', payload: 'success' })
+    await win.webContents.on('did-finish-load', async (evt, result) => {
+
+      win.webContents.executeJavaScript(`
         const init = async () => {
           const wait = async (selector) => {
             while(!document.querySelector(selector)) {
@@ -162,12 +161,12 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           const waitFor = async (seconds) => {
             await new Promise(r => setTimeout(r, seconds * 1000));
           }
-
           const payload = JSON.parse('${JSON.stringify(workoutList)}')
-
-          document.querySelector('.username').value = '${login}'
-          document.querySelector('.password').value = '${passwd}'
-          document.querySelector('.submit').dispatchEvent(new Event('click'))
+          if (document.querySelector('.username') && document.querySelector('.password')) {
+            document.querySelector('.username').value = '${login}'
+            document.querySelector('.password').value = '${passwd}'
+            document.querySelector('.submit').dispatchEvent(new Event('click'))
+          }
 
           await wait('.add-workout')
           document.querySelector('.add-workout').dispatchEvent(new Event('click'))
@@ -184,50 +183,59 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
             dt.items.add(file);
           }
           document.querySelector('[type="file"]').files = dt.files;
+          await waitFor(2);
 
-          setTimeout(async () => {
-            document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
+          document.querySelector('[type="file"]').dispatchEvent(new Event('change', { bubbles: true }));
+          
+          await waitFor(2);
+          await wait('.save-button');
 
-            await waitFor(2);
-            await wait('.save-button');
-            
-            await waitFor(2);
-            await wait('.select-sharing');
-            [...document.querySelectorAll('.select-sharing')].forEach(s => {
-              if (s) { 
-                s.querySelector('option[selected]').remove()
-                s.value = "string:Friends"
-                s.querySelector('option[value="string:Friends"]').setAttribute('selected', 'selected')
+          await waitFor(2);
+          await wait('.select-sharing');
+          [...document.querySelectorAll('.select-sharing')].forEach(s => {
+            if (s) { 
+              s.querySelector('option[selected]').remove()
+              s.querySelector('option[value="string:Friends"]')?.setAttribute('selected', 'selected')
+            }
+          });
+          await waitFor(1);
+          document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
+          document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
+          
+          await waitFor(2);
+          await wait('.select-activity');
+          [...document.querySelectorAll('[selected-date]')].forEach(el => {
+            const parent = el.closest('ul')
+            console.log('parent: ', parent)
+
+            if (payload.find(f => f.timestamp == el.attributes['selected-date'].value)) {
+              if (parent && parent.querySelector('.select-activity') && parent.querySelector('.select-activity') !== null) {
+                const newVal = payload.find(f => f.timestamp == el.attributes['selected-date'].value).sporttracker;
+                console.log('newVal: ', newVal);
+                parent.querySelector('.select-activity option[selected]').remove()
+                parent.querySelector('.select-activity option[label="'+newVal+'"]')?.setAttribute('selected', 'selected')
               }
-            });
-            
-            await waitFor(2);
-            await wait('.select-activity');
-            [...document.querySelectorAll('[selected-date]')].forEach(el => {
-              const parent = el.closest('ul')
+            }
+          })
+          document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
+          document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
 
-              if (payload.find(f => f.timestamp == el.attributes['selected-date'].value)) {
-                if (parent && parent.querySelector('.select-activity') && parent.querySelector('.select-activity') !== null) {
-                  const newVal = payload.find(f => f.timestamp == el.attributes['selected-date'].value).sporttracker;
-                  parent.querySelector('.select-activity option[selected]').remove()
-                  parent.querySelector('.select-activity').value = newVal
-                  parent.querySelector('.select-activity option[value="'+newVal+'"]').setAttribute('selected', 'selected')
-                }
-              }
-            })
-            document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
-            document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('input', { bubbles: true })))
-            document.querySelectorAll('.select-activity').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
-            document.querySelectorAll('.select-sharing').forEach(e => e.dispatchEvent(new Event('change', { bubbles: true })))
-
-            await waitFor(1);
-            document.querySelector('.save-button').dispatchEvent(new Event('click'))
-          }, 2000)
+          await waitFor(1);
+          document.querySelector('.save-button').dispatchEvent(new Event('click'))
+          //await waitFor(2);
+          console.log('done');
         }
         init()
-      `)
+      `).then(() => {
+        event.reply('asynchronous-reply', { part: true, action: 'convert-all-workouts', payload: 'success' })
+        setTimeout(() => {
+          win.destroy()
+        }, 2000)
+      }).catch(err => {
+        event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(err), action: 'convert-all-workouts' })
+        console.error(err)
+      })
     })
-    event.reply('asynchronous-reply', { update: 'Import finished', action: 'convert-all-workouts', payload: 'success' })
 
   } catch (error) {
     event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'convert-all-workouts' })
