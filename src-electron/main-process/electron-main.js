@@ -136,7 +136,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
     event.reply('asynchronous-reply', { success: true, action: 'convert-all-workouts' })
 
     const win = new BrowserWindow({
-      show: true,
+      show: false,
       // modal: true,
       // skipTaskbar: true,
       // frame: false,

@@ -12,6 +12,22 @@
     <q-separator vertical />
     <q-btn
       class="q-electron-drag--exception q-pr-sm"
+      href="https://github.com/YasiOnFire/eb2st"
+      type="a"
+      target="_blank"
+      dense
+      flat
+      stretch
+      label="GitHub"
+      icon="eva-github-outline"
+    >
+      <q-tooltip>
+        Open app source code
+      </q-tooltip>
+    </q-btn>
+    <q-separator vertical />
+    <q-btn
+      class="q-electron-drag--exception q-pr-sm"
       href="https://yasio.pl"
       type="a"
       target="_blank"
