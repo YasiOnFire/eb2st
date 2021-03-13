@@ -1,9 +1,9 @@
 # EndomondoBackup2SportsTracker (eb2st)
 
-Convert endomondo bacukp data and import to SportsTracker account.
+Convert endomondo backup data and import to SportsTracker account.
 
 ---
-Since sports-tracker does not have an official API and importing endomondo data directly form your endo backup is painful (you need to convert endo files, then import max 10 files at one, and manually assign workout type) this app will load all your workouts data, convert selected workouts, and automagicaly import and assign propper workout types to sports-tracker.
+Since sports-tracker does not have an official API and importing endomondo data directly form your endo backup is painful (you need to convert endo files, then import max 10 files at one, and manually assign workout type) this app will load all your workouts data, convert selected workouts, and automagicaly import and assign propper workout types to sports-tracker. And then will upload your photos to your workouts.
 
 ---
 
