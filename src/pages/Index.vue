@@ -58,7 +58,7 @@
           :pagination="{
             rowsPerPage: 100
           }"
-          :data="data"
+          :data="edata"
           row-key="file"
           :columns="[
             {
@@ -176,7 +176,7 @@
         <q-stepper-navigation>
           <q-btn size="lg" v-if="step > 1 && step < 4" flat color="deep-orange" @click="step--" label="Back" class="q-mr-md" />
           <q-btn size="lg" v-if="step === 4" flat color="deep-orange" @click="step = 1" :disabled="loaders.button" label="Start Over" class="q-mr-md" />
-          <q-btn size="lg" :disabled="invalidStep || loaders.button" :loading="loaders.button" @click="nextStep" color="primary" :label="step === 4 ? 'Restart' : 'Continue'" />
+          <q-btn size="lg" :disabled="invalidStep || loaders.button" :loading="loaders.button" @click="nextStep" color="primary" :label="step === 4 ? 'Restart process' : 'Continue'" />
         </q-stepper-navigation>
       </template>
     </q-stepper>
@@ -192,14 +192,14 @@ export default {
   name: 'PageIndex',
   data () {
     return {
-      data: [],
+      edata: [],
       typeMap,
       selectedWorkouts: [],
       step: 1,
       endoFolder: null,
       login: process.env.VUE_DEFAULT_LOGIN || '',
       passwd: process.env.VUE_DEFAULT_PASSWD || '',
-      code: 'Process started...\nThis might take a few minutes, the window may appear as frozen but unitl the loader is spinning the process is working.\nAs sports-tracker allows only 10 imports at once, this will import the workouts in batches of 10.\n\n',
+      code: 'Process started...\nThis might take a few minutes, the window may appear as frozen but unitl the loader is spinning the process is working.\nAs sports-tracker allows only 10 imports at once, this will import the workouts in batches of 10.\nAfter workout import, photo upload will begin.\n\n',
       errors: {
         file: false
       },
@@ -289,6 +289,28 @@ export default {
           workoutList: this.toProcess[this.currIndex]
         }))
       } else {
+        setTimeout(() => {
+          this.currIndex = 0
+          this.toProcess = this.selectedWorkouts.filter(w => w.pictures && w.key).map(el => {
+            const pictures = el.pictures.flat()
+            return {
+              ...el,
+              pictures: pictures.filter(p => p.picture).map(k => k.picture.flat()).flat().map(l => l.url)
+            }
+          })
+          this.uploadPhotos()
+        }, 2000)
+      }
+    },
+    uploadPhotos() {
+      if (this.currIndex < this.toProcess.length) {
+        this.ipcRenderer.send('upload-photos', JSON.stringify({
+          dir: this.endoDir,
+          login: this.login,
+          passwd: this.passwd,
+          workout: this.toProcess[this.currIndex]
+        }))
+      } else {
         this.setLoading(false)
         this.code += `\nProcess finished. Check your sports-tracker profile.`
         this.loaders.button = false
@@ -312,14 +334,14 @@ export default {
       if (arg.action && arg.action === 'read-all-workouts') {
         if (arg.success) {
           this.setLoading(false)
-          this.data = arg.payload.map((el, idx) => {
+          this.edata = arg.payload.map((el, idx) => {
             return {
               ...el,
               idx: idx + 1,
               sporttracker: typeMap.find(t => t.label.toLowerCase() === el.sport.replace('_', ' ').toLowerCase()) ? typeMap.find(t => t.label.toLowerCase() === el.sport.replace('_', ' ').toLowerCase()).value : 'Running'
             }
           })
-          this.setEndoData(this.data)
+          this.setEndoData(this.edata)
         }
       }
       if (arg.action && arg.action === 'validate-endo-dir') {
@@ -343,7 +365,27 @@ export default {
         if (arg.part) {
           this.code += `\nPart: ${this.currIndex + 1} finished importing`
           this.currIndex++
+          console.log('arg.payload: ', arg.payload);
+          arg.payload.forEach(el => {
+            if (this.edata.find(d => d.timestamp == el.timestamp)) {
+              this.edata.find(d => d.timestamp == el.timestamp).key = el.key
+            }
+            if (this.selectedWorkouts.find(d => d.timestamp == el.timestamp)) {
+              this.selectedWorkouts.find(d => d.timestamp == el.timestamp).key = el.key
+            }
+          })
+          this.setEndoData(this.edata)
           this.generate()
+        }
+      }
+      if (arg.action && arg.action === 'upload-photos') {
+        if (arg.update) {
+          this.code += `\n${arg.update} - ${JSON.stringify(arg.payload)}`
+        }
+        if (arg.part) {
+          this.code += `\nPart: ${this.currIndex + 1} uploaded`
+          this.currIndex++
+          this.uploadPhotos()
         }
         if (arg.success) {
           this.setLoading(false)

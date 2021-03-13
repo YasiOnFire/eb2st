@@ -1,6 +1,6 @@
 {
   "name": "eb2st",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Convert endomondo backup to gpx and automagicaly import to SportsTracker",
   "productName": "EndomondoBackup2SportsTracker",
   "author": "Yasio <baszczok@yasio.pl>",

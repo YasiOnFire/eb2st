@@ -205,6 +205,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           
           await waitFor(2);
           await wait('.select-activity');
+          const woKeys = [];
           [...document.querySelectorAll('[selected-date]')].forEach(el => {
             const parent = el.closest('ul');
             console.log('parent: ', parent);
@@ -215,6 +216,10 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
                 console.log('newVal: ', newVal);
                 parent.querySelector('.select-activity option[selected]').remove();
                 parent.querySelector('.select-activity option[label="'+newVal+'"]')?.setAttribute('selected', 'selected');
+                woKeys.push({
+                  timestamp: el.attributes['selected-date'].value,
+                  key: el.attributes['workout-key'].value
+                })
               }
             }
           })
@@ -225,10 +230,11 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
           document.querySelector('.save-button').dispatchEvent(new Event('click'));
           //await waitFor(2);
           console.log('done');
+          return woKeys;
         }
-        init();
-      `).then(() => {
-        event.reply('asynchronous-reply', { part: true, action: 'convert-all-workouts', payload: 'success' })
+        init().then(r => r);
+      `).then((result) => {
+        event.reply('asynchronous-reply', { part: true, action: 'convert-all-workouts', payload: result })
         setTimeout(() => {
           win.destroy()
         }, 2000)
@@ -240,6 +246,99 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
 
   } catch (error) {
     event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'convert-all-workouts' })
+    console.error(error)
+  }
+})
+
+ipcMain.on('upload-photos', async (event, args) => {
+  try {
+    const { dir, workout, login, passwd } = JSON.parse(args)
+
+    const fileBuffers = []
+    for await (const photos of workout.pictures) {
+      const f = await fs.readFileSync(`${dir}\\${photos}`, null)
+      fileBuffers.push(f.toString('base64'))
+    }
+
+    const win = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        devTools: true
+      }
+    })
+
+    win.loadURL('https://www.sports-tracker.com/login')
+    event.reply('asynchronous-reply', { update: 'Start photo upload', action: 'upload-photos', payload: 'success' })
+    
+    await win.webContents.on('did-finish-load', async (evt, result) => {
+      await win.webContents.on('did-navigate', async (evt, url) => {
+        if (url.indexOf('workout') > -1) {
+          console.log('url: ', url);
+          win.webContents.executeJavaScript(`
+            const init2 = async () => {
+              const wait = async (selector) => {
+                while(!document.querySelector(selector)) {
+                  await new Promise(r => setTimeout(r, 1500));
+                }
+              }
+              const waitFor = async (seconds) => {
+                await new Promise(r => setTimeout(r, seconds * 1000));
+              }
+              const dt = new DataTransfer();
+              const x = [${fileBuffers.map(d => `'${d}'`)}];
+              await wait('#workout-image-add-input');
+              for (const item of x) {
+                const response = await fetch('data:image/jpeg;base64,' + item);
+                const file = new File([await response.blob()], 'yasio.jpg', {type: 'image/jpeg'});
+                dt.items.add(file);
+              }
+              document.querySelector('#workout-image-add-input').files = dt.files;
+              await waitFor(2);
+    
+              document.querySelector('#workout-image-add-input').dispatchEvent(new Event('change', { bubbles: true }));
+              await wait('.workout-image-link')
+            }
+            init2()
+          `).then(() => {
+            event.reply('asynchronous-reply', { part: true, action: 'upload-photos', payload: 'true' })
+            setTimeout(() => {
+              win.destroy()
+            }, 1000)
+          })
+
+        }
+      })
+      win.webContents.executeJavaScript(`
+        const init = async () => {
+          const wait = async (selector) => {
+            while(!document.querySelector(selector)) {
+              await new Promise(r => setTimeout(r, 1500));
+            }
+          }
+          const waitFor = async (seconds) => {
+            await new Promise(r => setTimeout(r, seconds * 1000));
+          }
+          const payload = JSON.parse('${JSON.stringify(workout)}');
+
+          if (document.querySelector('.username') && document.querySelector('.password')) {
+            document.querySelector('.username').value = '${login}';
+            document.querySelector('.password').value = '${passwd}';
+            document.querySelector('.submit').dispatchEvent(new Event('click'));
+          }
+
+          await wait('.add-workout');
+
+          // tutaj te fecze w pętli
+          const user = document.querySelector('a[href^="/view_profile"]').href.substr(document.querySelector('a[href^="/view_profile"]').href.lastIndexOf('/') + 1);
+          window.location.href = 'https://www.sports-tracker.com/workout/' + user + '/' + payload.key;
+        };
+        init();
+      `)
+    });
+
+  } catch (error) {
+    event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'upload-photos' })
     console.error(error)
   }
 })
