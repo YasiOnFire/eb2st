@@ -52,6 +52,7 @@
           flat
           dark
           dense
+          square
           selection="multiple"
           :rows-per-page-options="[0]"
           :selected.sync="selectedWorkouts"
@@ -128,8 +129,8 @@
               <q-select
                 :value="props.row.sporttracker"
                 :options="typeMap"
+                options-dense
                 dense
-                filled
                 dark
                 emit-value
                 map-options
@@ -151,7 +152,7 @@
         <q-input filled v-model="login" label="Login" dark color="white" class="q-my-md" />
         <q-input filled v-model="passwd" label="Password" dark color="white" class="q-my-md" />
         <q-banner inline-actions rounded class="bg-orange text-white">
-          Your credentials are not stored anywhere, they are only used to login to your sports-tracker account and import created GPX files, and assign photos to them.
+          Your credentials are not stored anywhere, they are only used to login to your sports-tracker account and import created GPX files, and assign workout type, and upload photos.
         </q-banner>
 
       </q-step>
@@ -175,7 +176,7 @@
       <template v-slot:navigation>
         <q-stepper-navigation>
           <q-btn size="lg" v-if="step > 1 && step < 4" flat color="deep-orange" @click="step--" label="Back" class="q-mr-md" />
-          <q-btn size="lg" v-if="step === 4" flat color="deep-orange" @click="step = 1" :disabled="loaders.button" label="Start Over" class="q-mr-md" />
+          <q-btn size="lg" v-if="step === 4" flat color="deep-orange" @click="restartApp()" :disabled="loaders.button" label="Start Over" class="q-mr-md" />
           <q-btn size="lg" :disabled="invalidStep || loaders.button" :loading="loaders.button" @click="nextStep" color="primary" :label="step === 4 ? 'Restart process' : 'Continue'" />
         </q-stepper-navigation>
       </template>
@@ -187,6 +188,7 @@
 import 'dotenv/config'
 import { mapMutations, mapGetters } from 'vuex'
 import { typeMap } from '../assets/type-map'
+import { Notify } from 'quasar'
 
 export default {
   name: 'PageIndex',
@@ -260,6 +262,10 @@ export default {
     mapSportChange(value, file) {
       this.setSport({value, file})
     },
+    restartApp() {
+      this.ipcRenderer.send('kill-all')
+      window.location.reload(true)
+    },
     getEndoWorkouts() {
       this.setLoading(true)
       this.ipcRenderer.send('read-all-workouts', this.endoDir)
@@ -289,17 +295,30 @@ export default {
           workoutList: this.toProcess[this.currIndex]
         }))
       } else {
-        setTimeout(() => {
-          this.currIndex = 0
-          this.toProcess = this.selectedWorkouts.filter(w => w.pictures && w.key).map(el => {
-            const pictures = el.pictures.flat()
-            return {
-              ...el,
-              pictures: pictures.filter(p => p.picture).map(k => k.picture.flat()).flat().map(l => l.url)
-            }
+        if (this.selectedWorkouts.filter(w => w.pictures && w.key).length > 0) {
+          setTimeout(() => {
+            this.currIndex = 0
+            this.toProcess = this.selectedWorkouts.filter(w => w.pictures && w.key).map(el => {
+              const pictures = el.pictures.flat()
+              return {
+                ...el,
+                pictures: pictures.filter(p => p.picture).map(k => k.picture.flat()).flat().map(l => l.url)
+              }
+            })
+            this.uploadPhotos()
+          }, 2000)
+        } else {
+          this.setLoading(false)
+          this.code += `\n\nProcess finished. Check your sports-tracker profile.`
+          this.loaders.button = false
+          Notify.create({
+            message: 'FINISHED',
+            progress: true,
+            type: 'positive',
+            position: 'bottom',
+            timeout: 10000
           })
-          this.uploadPhotos()
-        }, 2000)
+        }
       }
     },
     uploadPhotos() {
@@ -312,8 +331,15 @@ export default {
         }))
       } else {
         this.setLoading(false)
-        this.code += `\nProcess finished. Check your sports-tracker profile.`
+        this.code += `\n\nProcess finished. Check your sports-tracker profile.`
         this.loaders.button = false
+        Notify.create({
+          message: 'FINISHED',
+          progress: true,
+          type: 'positive',
+          position: 'bottom',
+          timeout: 10000
+        })
       }
     },
     nextStep() {
@@ -341,6 +367,7 @@ export default {
               sporttracker: typeMap.find(t => t.label.toLowerCase() === el.sport.replace('_', ' ').toLowerCase()) ? typeMap.find(t => t.label.toLowerCase() === el.sport.replace('_', ' ').toLowerCase()).value : 'Running'
             }
           })
+          this.selectedWorkouts = JSON.parse(JSON.stringify(this.edata))
           this.setEndoData(this.edata)
         }
       }

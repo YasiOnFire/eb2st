@@ -29,7 +29,7 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
-    width: 1800,
+    width: 1200,
     height: 700,
     useContentSize: true,
     frame: false,
@@ -68,7 +68,6 @@ app.on('activate', () => {
 
 ipcMain.on('validate-endo-dir', (event, arg) => {
   try {
-    console.log('arg: ', arg);
     const dir = path.dirname(JSON.parse(arg))
     const response = fs.readdirSync(dir)
     if (!response.includes('Workouts') || !response.includes('resources')) {
@@ -148,7 +147,7 @@ ipcMain.on('convert-all-workouts', async (event, args) => {
       }
     })
     win.loadURL('https://www.sports-tracker.com/login')
-    event.reply('asynchronous-reply', { update: 'Start batch importing', action: 'convert-all-workouts', payload: 'success' })
+    event.reply('asynchronous-reply', { update: 'Start batch importing', action: 'convert-all-workouts', payload: 'in progress' })
     
     await win.webContents.on('did-finish-load', async (evt, result) => {
 
@@ -262,6 +261,7 @@ ipcMain.on('upload-photos', async (event, args) => {
 
     const win = new BrowserWindow({
       show: false,
+      maximizable: false,
       webPreferences: {
         nodeIntegration: false,
         devTools: true
@@ -269,7 +269,7 @@ ipcMain.on('upload-photos', async (event, args) => {
     })
 
     win.loadURL('https://www.sports-tracker.com/login')
-    event.reply('asynchronous-reply', { update: 'Start photo upload', action: 'upload-photos', payload: 'success' })
+    event.reply('asynchronous-reply', { update: 'Start sequential photo upload', action: 'upload-photos', payload: 'in progress' })
     
     await win.webContents.on('did-finish-load', async (evt, result) => {
       await win.webContents.on('did-navigate', async (evt, url) => {
@@ -341,4 +341,11 @@ ipcMain.on('upload-photos', async (event, args) => {
     event.reply('asynchronous-reply', { error: true, errorMessage: JSON.stringify(error), action: 'upload-photos' })
     console.error(error)
   }
+})
+
+ipcMain.on('kill-all', async (event, args) => {
+  const all = BrowserWindow.getAllWindows()
+  if (all[0] && !all[0].isVisible) all[0].destroy()
+  if (all[1] && !all[1].isVisible) all[1].destroy()
+  if (all[2] && !all[2].isVisible) all[2].destroy()
 })

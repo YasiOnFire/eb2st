@@ -1,9 +1,9 @@
-# EndomondoBackup2SportsTracker (eb2st)
+# EndomondoBackup2SportsTracker Converter/Importer  (eb2st)
 
-Convert endomondo backup data and import to SportsTracker account.
+Convert endomondo backup data and import to your SportsTracker account.
 
 ---
-Since sports-tracker does not have an official API and importing endomondo data directly form your endo backup is painful (you need to convert endo files, then import max 10 files at one, and manually assign workout type) this app will load all your workouts data, convert selected workouts, and automagicaly import and assign propper workout types to sports-tracker. And then will upload your photos to your workouts.
+Since sports-tracker does not have an official API and importing endomondo data directly form your endo backup is painful (you need to convert tcx files to gpx, then import max. 10 files at one, and manually assign workout type, and manually upload photos) this app will load all your workouts data, convert selected workouts, and automagicaly import and assign propper workout types to sports-tracker (also it will upload your photos to your workouts).
 
 ---
 
@@ -22,8 +22,8 @@ npm run dev
 npm run package
 ```
 
-## IMPORTANT
+## Note
 
-* No credentials are stored. They are used to log in to your sports-tracker account to perform the import.
-* Some of the converted workouts just do not work in sports-stacker (it's a small percentage)
-* You can build executables for other OS'es. Or run form the source.
+* No credentials are stored. They are used to log in to your sports-tracker account to perform the import
+* Some of the converted workouts just do not work in sports-stacker (it's a small percentage thought)
+* You can build executables for other OS'es (or just run form the source)

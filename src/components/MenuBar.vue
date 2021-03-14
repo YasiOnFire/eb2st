@@ -12,7 +12,6 @@
     <q-separator vertical />
     <q-btn
       class="q-electron-drag--exception q-pr-sm"
-      href="https://github.com/YasiOnFire/eb2st"
       type="a"
       target="_blank"
       dense
@@ -20,6 +19,7 @@
       stretch
       label="GitHub"
       icon="eva-github-outline"
+      @click="openInBrowser('https://github.com/YasiOnFire/eb2st')"
     >
       <q-tooltip>
         Open app source code
@@ -28,7 +28,6 @@
     <q-separator vertical />
     <q-btn
       class="q-electron-drag--exception q-pr-sm"
-      href="https://yasio.pl"
       type="a"
       target="_blank"
       dense
@@ -36,6 +35,7 @@
       stretch
       label="yasio.pl"
       icon="eva-person-outline"
+      @click="openInBrowser('https://yasio.pl')"
     >
       <q-tooltip>
         Visit https://yasio.pl
@@ -73,6 +73,8 @@
 </template>
 
 <script>
+import { shell } from 'electron'
+
 export default {
   data () {
     return {
@@ -81,6 +83,9 @@ export default {
     }
   },
   methods: {
+    openInBrowser(url) {
+      shell.openExternal(url)
+    },
     closeWindow () {
       const window = this.remote.BrowserWindow.getFocusedWindow()
       window.close()
