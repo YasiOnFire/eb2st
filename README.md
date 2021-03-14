@@ -7,6 +7,9 @@ Since sports-tracker does not have an official API and importing endomondo data 
 
 ---
 
+![gif](https://user-images.githubusercontent.com/3300701/111077400-e8578780-84f0-11eb-81d0-806f508e209a.gif)
+
+
 ## Install the dependencies
 ```bash
 yarn
