@@ -9,6 +9,13 @@ Since sports-tracker does not have an official API and importing endomondo data 
 
 ![gif](https://user-images.githubusercontent.com/3300701/111077400-e8578780-84f0-11eb-81d0-806f508e209a.gif)
 
+# Usage
+1. [Download](https://github.com/YasiOnFire/eb2st/releases/download/0.0.2/eb2st-0.0.2-setup.exe) and install or [start](https://github.com/YasiOnFire/eb2st/releases/download/0.0.2/EndomondoBackup2SportsTracker-win32-x64.zip) (portable version) the app
+2. Select your endomondo backup directory
+3. Select workouts you whant to import
+4. Converting and importing your workouts may thake a few minutes. (380 workouts with photos took about 8 minutes for me).
+
+# Development
 
 ## Install the dependencies
 ```bash
@@ -28,5 +35,5 @@ npm run package
 ## Note
 
 * No credentials are stored. They are used to log in to your sports-tracker account to perform the import
-* Some of the converted workouts just do not work in sports-stacker (it's a small percentage thought)
+* Some of the converted workouts just do not work in sports-tacker (it's a small percentage thought)
 * You can build executables for other OS'es (or just run form the source)
